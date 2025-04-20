@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { authService, LoginCredentials } from '@/api/authService';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -32,26 +33,25 @@ const Login = () => {
     setIsLoading(true);
     
     try {
-      // In a real app, this would be an API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const credentials: LoginCredentials = {
+        email,
+        password,
+        rememberMe
+      };
       
-      // For demo, accept any login with proper email format
-      if (email.includes('@')) {
-        // Successful login
-        toast({
-          title: "Login successful",
-          description: "Welcome to PiShield Dashboard"
-        });
-        
-        navigate('/');
-      } else {
-        // Failed login
-        setError('Invalid email format. Please try again.');
-        setIsLoading(false);
-      }
+      await authService.login(credentials);
+      
+      // Successful login
+      toast({
+        title: "Login successful",
+        description: "Welcome to PiShield Dashboard"
+      });
+      
+      navigate('/');
     } catch (err) {
       console.error('Login error:', err);
-      setError('An error occurred during login. Please try again.');
+      setError('Invalid credentials. Please try again.');
+    } finally {
       setIsLoading(false);
     }
   };

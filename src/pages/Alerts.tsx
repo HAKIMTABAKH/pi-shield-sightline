@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Bell } from 'lucide-react';
 import MainLayout from '@/components/layout/MainLayout';
 import AlertsTable, { Alert } from '@/components/alerts/AlertsTable';
@@ -11,86 +11,134 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-
-// Generate mock alerts data
-const generateMockAlerts = (): Alert[] => {
-  const alertTypes = [
-    'SQL Injection Attempt',
-    'Cross-Site Scripting (XSS)',
-    'Port Scan',
-    'Brute Force Attack',
-    'DDoS Attempt',
-    'Directory Traversal',
-    'Command Injection',
-    'Malware Communication',
-    'Suspicious File Access'
-  ];
-  
-  const alerts: Alert[] = [];
-  
-  // Generate 20 random alerts
-  for (let i = 0; i < 20; i++) {
-    const severity: Alert['severity'] = 
-      i < 3 ? 'critical' : 
-      i < 8 ? 'high' : 
-      i < 15 ? 'medium' : 'low';
-    
-    const status: Alert['status'] = 
-      i < 5 ? 'new' : 
-      i < 12 ? 'investigating' : 'resolved';
-    
-    const date = new Date();
-    date.setMinutes(date.getMinutes() - (i * 30)); // Each alert is 30 minutes apart
-    
-    alerts.push({
-      id: `alert-${(1000 + i).toString()}`,
-      timestamp: date.toISOString(),
-      severity,
-      type: alertTypes[Math.floor(Math.random() * alertTypes.length)],
-      sourceIp: `192.168.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`,
-      destPort: Math.floor(Math.random() * 65000) + 1,
-      status,
-      details: `This is a detailed description of a ${severity} ${alertTypes[Math.floor(Math.random() * alertTypes.length)]} attack. The attack was detected by PiShield's intrusion detection system and appropriate countermeasures have been applied.`
-    });
-  }
-  
-  return alerts;
-};
+import { alertService } from '@/api/alertService';
+import { useToast } from '@/hooks/use-toast';
+import { websocketService } from '@/api/websocketService';
 
 const Alerts = () => {
-  const [alerts, setAlerts] = useState<Alert[]>(generateMockAlerts());
+  const [alerts, setAlerts] = useState<Alert[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [severityFilter, setSeverityFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
   
-  // Filter alerts based on search and filters
-  const filteredAlerts = alerts.filter(alert => {
-    // Search term filtering
-    const searchMatch = 
-      alert.sourceIp.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      alert.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      alert.id.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    // Severity filtering
-    const severityMatch = severityFilter === 'all' || alert.severity === severityFilter;
-    
-    // Status filtering
-    const statusMatch = statusFilter === 'all' || alert.status === statusFilter;
-    
-    return searchMatch && severityMatch && statusMatch;
-  });
+  // Function to load alerts with current filters
+  const loadAlerts = async () => {
+    setIsLoading(true);
+    try {
+      const filters: Record<string, string> = {};
+      if (severityFilter !== 'all') filters.severity = severityFilter;
+      if (statusFilter !== 'all') filters.status = statusFilter;
+      if (searchTerm) filters.search = searchTerm;
+      
+      const fetchedAlerts = await alertService.getAlerts(filters);
+      setAlerts(fetchedAlerts);
+    } catch (error) {
+      console.error('Error loading alerts:', error);
+      toast({
+        title: "Failed to load alerts",
+        description: "Could not retrieve alert data from the server.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Initial load and when filters change
+  useEffect(() => {
+    loadAlerts();
+  }, [severityFilter, statusFilter, searchTerm]);
+  
+  // Setup WebSocket for real-time updates
+  useEffect(() => {
+    // Connect to WebSocket
+    websocketService.connect();
+
+    // Listen for new alerts
+    const handleNewAlert = (data: Alert) => {
+      toast({
+        title: `New ${data.severity} Alert`,
+        description: `${data.type} from ${data.sourceIp}`,
+        variant: data.severity === 'critical' ? 'destructive' : 'default'
+      });
+      
+      // Add to alerts list if it matches current filters
+      const matchesFilter = 
+        (severityFilter === 'all' || data.severity === severityFilter) &&
+        (statusFilter === 'all' || data.status === statusFilter) &&
+        (!searchTerm || 
+          data.sourceIp.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          data.type.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      if (matchesFilter) {
+        setAlerts(prev => [data, ...prev]);
+      }
+    };
+
+    // Listen for alert status updates
+    const handleAlertUpdate = (data: { id: string; status: Alert['status'] }) => {
+      setAlerts(prev => 
+        prev.map(alert => 
+          alert.id === data.id 
+            ? { ...alert, status: data.status } 
+            : alert
+        )
+      );
+    };
+
+    websocketService.on('NEW_ALERT', handleNewAlert);
+    websocketService.on('ALERT_UPDATE', handleAlertUpdate);
+
+    return () => {
+      // Clean up event listeners
+      websocketService.off('NEW_ALERT', handleNewAlert);
+      websocketService.off('ALERT_UPDATE', handleAlertUpdate);
+    };
+  }, [toast, severityFilter, statusFilter, searchTerm]);
   
   // Handle alert status change
-  const handleStatusChange = (alertId: string, newStatus: Alert['status']) => {
-    setAlerts(alerts.map(alert => 
-      alert.id === alertId ? { ...alert, status: newStatus } : alert
-    ));
+  const handleStatusChange = async (alertId: string, newStatus: Alert['status']) => {
+    try {
+      await alertService.updateAlertStatus(alertId, newStatus);
+      
+      // Update local state
+      setAlerts(alerts.map(alert => 
+        alert.id === alertId ? { ...alert, status: newStatus } : alert
+      ));
+      
+      toast({
+        title: "Alert status updated",
+        description: `Alert ${alertId} is now ${newStatus}`,
+      });
+    } catch (error) {
+      console.error('Error updating alert status:', error);
+      toast({
+        title: "Failed to update status",
+        description: "There was an error updating the alert status.",
+        variant: "destructive"
+      });
+    }
   };
   
   // Handle blocking an IP
-  const handleBlockIp = (sourceIp: string) => {
-    console.log(`IP ${sourceIp} has been blocked`);
-    // In a real app, this would call an API endpoint to block the IP
+  const handleBlockIp = async (sourceIp: string) => {
+    try {
+      const result = await alertService.blockIp(sourceIp);
+      
+      toast({
+        title: "IP Blocked",
+        description: result.message || `IP ${sourceIp} has been blocked.`,
+      });
+    } catch (error) {
+      console.error('Error blocking IP:', error);
+      toast({
+        title: "Failed to block IP",
+        description: "There was an error blocking the IP address.",
+        variant: "destructive"
+      });
+    }
   };
   
   return (
@@ -141,14 +189,14 @@ const Alerts = () => {
       </div>
       
       <AlertsTable 
-        alerts={filteredAlerts} 
+        alerts={alerts} 
         onStatusChange={handleStatusChange}
         onBlockIp={handleBlockIp}
+        isLoading={isLoading}
       />
       
       <div className="text-sm text-muted-foreground mt-4">
-        Showing {filteredAlerts.length} alerts
-        {filteredAlerts.length !== alerts.length && ` (filtered from ${alerts.length})`}
+        Showing {alerts.length} alerts
       </div>
     </MainLayout>
   );

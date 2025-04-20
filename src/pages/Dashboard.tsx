@@ -1,20 +1,78 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ShieldCheck, Bell, AlertTriangle, Wifi } from 'lucide-react';
 import MainLayout from '@/components/layout/MainLayout';
 import MetricCard from '@/components/dashboard/MetricCard';
 import AttackChart from '@/components/dashboard/AttackChart';
 import RecentAlerts from '@/components/dashboard/RecentAlerts';
 import AttackMap from '@/components/dashboard/AttackMap';
+import { dashboardService, DashboardStats } from '@/api/dashboardService';
+import { websocketService } from '@/api/websocketService';
+import { useToast } from '@/hooks/use-toast';
 
 const Dashboard = () => {
-  // In a real app, this would fetch data from the backend
-  const dashboardData = {
-    attacksBlocked: 42,
-    activeAlerts: 3,
+  const [dashboardData, setDashboardData] = useState<DashboardStats>({
+    attacksBlocked: 0,
+    activeAlerts: 0,
     riskLevel: 'Medium',
-    deviceCount: 18
-  };
+    deviceCount: 0
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const stats = await dashboardService.getStats();
+        setDashboardData(stats);
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+        toast({
+          title: "Failed to load dashboard data",
+          description: "Please check your connection to the Raspberry Pi.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+
+    // Connect to WebSocket for real-time updates
+    websocketService.connect();
+
+    // Listen for stats updates
+    const handleStatsUpdate = (data: DashboardStats) => {
+      setDashboardData(data);
+      console.log('Dashboard stats updated via WebSocket');
+    };
+
+    // Listen for new alerts
+    const handleNewAlert = (data: any) => {
+      toast({
+        title: `New ${data.severity} Alert`,
+        description: `${data.type} from ${data.sourceIp}`,
+        variant: data.severity === 'critical' ? 'destructive' : 'default'
+      });
+      
+      // Update active alerts count
+      setDashboardData(prev => ({
+        ...prev,
+        activeAlerts: prev.activeAlerts + 1
+      }));
+    };
+
+    websocketService.on('STATS_UPDATE', handleStatsUpdate);
+    websocketService.on('NEW_ALERT', handleNewAlert);
+
+    return () => {
+      // Clean up event listeners when component unmounts
+      websocketService.off('STATS_UPDATE', handleStatsUpdate);
+      websocketService.off('NEW_ALERT', handleNewAlert);
+      // Don't disconnect here as other components might need it
+    };
+  }, [toast]);
 
   const getStatusFromAlertCount = (count: number) => {
     if (count === 0) return 'success';

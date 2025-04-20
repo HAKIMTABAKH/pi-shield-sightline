@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   LineChart, 
   Line, 
@@ -12,45 +12,20 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BarChart } from 'lucide-react';
-
-// Mock data for the chart
-const generateChartData = (days: number) => {
-  const data = [];
-  const now = new Date();
-  
-  for (let i = days; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(now.getDate() - i);
-    
-    // Generate random attack counts, weighted for more recent days to show a pattern
-    let attackCount;
-    if (i < 2) {
-      // Most recent days have higher counts
-      attackCount = Math.floor(Math.random() * 20) + 5;
-    } else if (i < 4) {
-      // Medium recent days have medium counts
-      attackCount = Math.floor(Math.random() * 15) + 3;
-    } else {
-      // Older days have lower counts
-      attackCount = Math.floor(Math.random() * 10) + 1;
-    }
-    
-    data.push({
-      date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      attacks: attackCount
-    });
-  }
-  
-  return data;
-};
+import { dashboardService, ChartDataPoint } from '@/api/dashboardService';
 
 const AttackChart = () => {
   const [timeRange, setTimeRange] = useState('7');
-  const [chartData, setChartData] = useState(() => generateChartData(7));
+  const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
+  
+  useEffect(() => {
+    // Get chart data from service
+    const data = dashboardService.getChartData(parseInt(timeRange));
+    setChartData(data);
+  }, [timeRange]);
   
   const handleTimeRangeChange = (value: string) => {
     setTimeRange(value);
-    setChartData(generateChartData(parseInt(value)));
   };
   
   return (
