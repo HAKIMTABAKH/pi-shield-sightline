@@ -15,7 +15,8 @@ const Dashboard = () => {
     attacksBlocked: 0,
     activeAlerts: 0,
     riskLevel: 'Medium',
-    deviceCount: 0
+    deviceCount: 0,
+    blockedIpCount: 0  // Added missing property
   });
   const [isLoading, setIsLoading] = useState(true);
   const [dataSource, setDataSource] = useState<'live' | 'demo'>('live');

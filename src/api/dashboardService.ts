@@ -1,4 +1,3 @@
-
 import { API_ENDPOINTS, getRequestOptions } from './config';
 import { authService } from './authService';
 
@@ -8,19 +7,6 @@ export interface DashboardStats {
   riskLevel: 'Low' | 'Medium' | 'High';
   deviceCount: number;
   blockedIpCount: number;
-}
-
-export interface AttackSource {
-  id: string;
-  sourceIp: string;
-  country: string;
-  timestamp: Date;
-  severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
-}
-
-export interface ChartDataPoint {
-  date: string;
-  attacks: number;
 }
 
 export const dashboardService = {
