@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { ShieldCheck, Bell, ExclamationTriangle, Wifi } from 'lucide-react';
+import { ShieldCheck, Bell, AlertTriangle, Wifi } from 'lucide-react';
 import MainLayout from '@/components/layout/MainLayout';
 import MetricCard from '@/components/dashboard/MetricCard';
 import AttackChart from '@/components/dashboard/AttackChart';
@@ -46,7 +46,7 @@ const Dashboard = () => {
         <MetricCard
           title="Network Risk Level"
           value={dashboardData.riskLevel}
-          icon={<ExclamationTriangle className="h-6 w-6" />}
+          icon={<AlertTriangle className="h-6 w-6" />}
           status={getStatusFromRiskLevel(dashboardData.riskLevel)}
         />
         <MetricCard
