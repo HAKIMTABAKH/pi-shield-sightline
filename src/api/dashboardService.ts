@@ -1,3 +1,4 @@
+
 import { API_ENDPOINTS, getRequestOptions } from './config';
 import { authService } from './authService';
 
@@ -6,6 +7,7 @@ export interface DashboardStats {
   activeAlerts: number;
   riskLevel: 'Low' | 'Medium' | 'High';
   deviceCount: number;
+  blockedIpCount: number;
 }
 
 export interface AttackSource {
@@ -13,6 +15,7 @@ export interface AttackSource {
   sourceIp: string;
   country: string;
   timestamp: Date;
+  severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
 }
 
 export interface ChartDataPoint {
@@ -30,7 +33,8 @@ export const dashboardService = {
           attacksBlocked: Math.floor(Math.random() * 50) + 10,
           activeAlerts: Math.floor(Math.random() * 10),
           riskLevel: ['Low', 'Medium', 'High'][Math.floor(Math.random() * 3)] as 'Low' | 'Medium' | 'High',
-          deviceCount: Math.floor(Math.random() * 20) + 5
+          deviceCount: Math.floor(Math.random() * 20) + 5,
+          blockedIpCount: Math.floor(Math.random() * 5)
         };
       }
       
@@ -52,7 +56,8 @@ export const dashboardService = {
         attacksBlocked: 25,
         activeAlerts: 3,
         riskLevel: 'Medium',
-        deviceCount: 12
+        deviceCount: 12,
+        blockedIpCount: 2
       };
     }
   },
@@ -60,31 +65,31 @@ export const dashboardService = {
   async getAttackSources(): Promise<AttackSource[]> {
     try {
       // Always return mock data to ensure functionality
-      const countries = ['Brazil', 'Russia', 'India', 'China', 'United States', 'Ukraine', 'Netherlands'];
-      
       return [
         { 
           id: 'attack-1', 
           sourceIp: '203.0.113.42', 
           country: 'China', 
-          timestamp: new Date(Date.now() - 45000) 
+          timestamp: new Date(Date.now() - 45000),
+          severity: 'high'
         },
         { 
           id: 'attack-2', 
           sourceIp: '198.51.100.22', 
           country: 'Russia', 
-          timestamp: new Date(Date.now() - 120000) 
+          timestamp: new Date(Date.now() - 120000),
+          severity: 'critical'
         },
         { 
           id: 'attack-3', 
           sourceIp: '192.0.2.89', 
           country: 'United States', 
-          timestamp: new Date(Date.now() - 300000) 
+          timestamp: new Date(Date.now() - 300000),
+          severity: 'medium'
         }
       ];
     } catch (error) {
       console.error('Error fetching attack sources:', error);
-      // Return empty array as fallback
       return [];
     }
   },

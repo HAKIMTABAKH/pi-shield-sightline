@@ -11,33 +11,54 @@ export type Database = {
     Tables: {
       alerts: {
         Row: {
-          dest_port: number | null
-          details: string | null
+          alert_timestamp: string
+          created_at: string
+          destination_ip: unknown | null
+          destination_port: number | null
           id: string
+          protocol: string | null
+          raw_log: Json | null
+          resolved_at: string | null
+          resolved_by_user_id: string | null
+          rule_id: string | null
           severity: string
-          source_ip: string
+          source_ip: unknown
+          source_port: number | null
           status: string
-          timestamp: string
           type: string
         }
         Insert: {
-          dest_port?: number | null
-          details?: string | null
+          alert_timestamp?: string
+          created_at?: string
+          destination_ip?: unknown | null
+          destination_port?: number | null
           id?: string
+          protocol?: string | null
+          raw_log?: Json | null
+          resolved_at?: string | null
+          resolved_by_user_id?: string | null
+          rule_id?: string | null
           severity: string
-          source_ip: string
+          source_ip: unknown
+          source_port?: number | null
           status?: string
-          timestamp?: string
           type: string
         }
         Update: {
-          dest_port?: number | null
-          details?: string | null
+          alert_timestamp?: string
+          created_at?: string
+          destination_ip?: unknown | null
+          destination_port?: number | null
           id?: string
+          protocol?: string | null
+          raw_log?: Json | null
+          resolved_at?: string | null
+          resolved_by_user_id?: string | null
+          rule_id?: string | null
           severity?: string
-          source_ip?: string
+          source_ip?: unknown
+          source_port?: number | null
           status?: string
-          timestamp?: string
           type?: string
         }
         Relationships: []
@@ -46,25 +67,39 @@ export type Database = {
         Row: {
           blocked_by_user_id: string | null
           created_at: string
+          expires_at: string | null
           id: string
-          ip_address: string
+          ip_address: unknown
           reason: string | null
+          triggering_alert_id: string | null
         }
         Insert: {
           blocked_by_user_id?: string | null
           created_at?: string
+          expires_at?: string | null
           id?: string
-          ip_address: string
+          ip_address: unknown
           reason?: string | null
+          triggering_alert_id?: string | null
         }
         Update: {
           blocked_by_user_id?: string | null
           created_at?: string
+          expires_at?: string | null
           id?: string
-          ip_address?: string
+          ip_address?: unknown
           reason?: string | null
+          triggering_alert_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "blocked_ips_triggering_alert_id_fkey"
+            columns: ["triggering_alert_id"]
+            isOneToOne: false
+            referencedRelation: "alerts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -87,6 +122,24 @@ export type Database = {
           id?: string
           role?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      settings: {
+        Row: {
+          key: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: string
         }
         Relationships: []
       }

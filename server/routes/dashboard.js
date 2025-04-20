@@ -8,21 +8,25 @@ const router = express.Router();
 // Get dashboard stats
 router.get('/stats', async (req, res) => {
   try {
-    // Count attacks blocked (all alerts)
+    // Count all alerts in the last 24 hours
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
     const { count: attacksBlocked, error: attacksError } = await supabaseAdmin
       .from('alerts')
-      .select('*', { count: 'exact', head: true });
+      .select('*', { count: 'exact', head: true })
+      .gte('alert_timestamp', today.toISOString());
     
     if (attacksError) {
       logger.error(`Error counting attacks: ${attacksError.message}`);
       return res.status(500).json({ error: attacksError.message });
     }
     
-    // Count active alerts (status is not 'resolved')
+    // Count active alerts (status is not 'resolved' or 'ignored')
     const { count: activeAlerts, error: alertsError } = await supabaseAdmin
       .from('alerts')
       .select('*', { count: 'exact', head: true })
-      .not('status', 'eq', 'resolved');
+      .not('status', 'in', '("resolved","ignored")');
     
     if (alertsError) {
       logger.error(`Error counting active alerts: ${alertsError.message}`);
@@ -32,43 +36,47 @@ router.get('/stats', async (req, res) => {
     // Get count of blocked IPs
     const { count: blockedIpCount, error: blockedIpError } = await supabaseAdmin
       .from('blocked_ips')
-      .select('*', { count: 'exact', head: true });
+      .select('*', { count: 'exact', head: true })
+      .is('expires_at', null)
+      .gt('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
     
     if (blockedIpError) {
       logger.error(`Error counting blocked IPs: ${blockedIpError.message}`);
       return res.status(500).json({ error: blockedIpError.message });
     }
     
-    // Get list of recent critical alerts to determine risk level
-    const { data: criticalAlerts, error: criticalError } = await supabaseAdmin
+    // Get list of recent critical/high alerts to determine risk level
+    const { data: recentAlerts, error: criticalError } = await supabaseAdmin
       .from('alerts')
       .select('severity')
-      .eq('severity', 'critical')
-      .order('timestamp', { ascending: false })
-      .limit(10);
+      .in('severity', ['critical', 'high'])
+      .gt('alert_timestamp', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      .order('alert_timestamp', { ascending: false });
     
     if (criticalError) {
       logger.error(`Error getting critical alerts: ${criticalError.message}`);
       return res.status(500).json({ error: criticalError.message });
     }
     
-    // Determine risk level based on critical alerts
+    // Determine risk level based on recent critical/high alerts
     let riskLevel = 'Low';
-    if (criticalAlerts && criticalAlerts.length > 5) {
-      riskLevel = 'High';
-    } else if (criticalAlerts && criticalAlerts.length > 2) {
-      riskLevel = 'Medium';
+    if (recentAlerts) {
+      const criticalCount = recentAlerts.filter(a => a.severity === 'critical').length;
+      const highCount = recentAlerts.filter(a => a.severity === 'high').length;
+      
+      if (criticalCount > 2 || highCount > 5) {
+        riskLevel = 'High';
+      } else if (criticalCount > 0 || highCount > 2) {
+        riskLevel = 'Medium';
+      }
     }
-    
-    // Get device count (this is a placeholder - in a real app, you'd have a devices table)
-    const deviceCount = 10; // For demo purposes
     
     // Return dashboard stats
     return res.status(200).json({
       attacksBlocked: attacksBlocked || 0,
       activeAlerts: activeAlerts || 0,
       riskLevel,
-      deviceCount,
+      deviceCount: 10, // Placeholder - implement device tracking if needed
       blockedIpCount: blockedIpCount || 0
     });
   } catch (error) {
@@ -135,8 +143,8 @@ router.get('/attack-sources', async (req, res) => {
   try {
     const { data, error } = await supabaseAdmin
       .from('alerts')
-      .select('id, sourceIp, timestamp')
-      .order('timestamp', { ascending: false })
+      .select('id, source_ip, alert_timestamp, severity')
+      .order('alert_timestamp', { ascending: false })
       .limit(5);
     
     if (error) {
@@ -144,13 +152,13 @@ router.get('/attack-sources', async (req, res) => {
       return res.status(500).json({ error: error.message });
     }
     
-    // Transform the data into the expected format
-    // In a real app, you might use a geolocation service to get the country
-    const sources = data.map(item => ({
-      id: item.id,
-      sourceIp: item.sourceIp,
+    // Transform the data and add mock country data
+    const sources = data.map(alert => ({
+      id: alert.id,
+      sourceIp: alert.source_ip,
       country: getRandomCountry(), // Mock function for demo
-      timestamp: new Date(item.timestamp)
+      timestamp: new Date(alert.alert_timestamp),
+      severity: alert.severity
     }));
     
     return res.status(200).json(sources);
