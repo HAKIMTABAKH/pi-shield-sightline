@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { UserCircle, LogOut, Settings } from 'lucide-react';
+import { LogOut, Settings, UserCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { 
   DropdownMenu, 
@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 interface HeaderProps {
   title: string;
@@ -20,6 +20,7 @@ const Header = ({ title }: HeaderProps) => {
   // Mock user state - would be from auth context in real app
   const [user] = useState({ email: 'admin@pishield.local' });
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const handleLogout = () => {
     // In a real app, this would call auth logout function
@@ -27,6 +28,9 @@ const Header = ({ title }: HeaderProps) => {
       title: "Logged out successfully",
       description: "You have been logged out of the system.",
     });
+    
+    // Redirect to login page
+    navigate('/login');
   };
 
   return (
@@ -64,3 +68,4 @@ const Header = ({ title }: HeaderProps) => {
 };
 
 export default Header;
+
