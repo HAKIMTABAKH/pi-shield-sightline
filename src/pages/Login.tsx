@@ -11,8 +11,8 @@ import { useToast } from '@/hooks/use-toast';
 import { authService, LoginCredentials } from '@/api/authService';
 
 const Login = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('admin@pishield.local');
+  const [password, setPassword] = useState('test1234');
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -47,7 +47,7 @@ const Login = () => {
         description: "Welcome to PiShield Dashboard"
       });
       
-      navigate('/');
+      navigate('/dashboard');
     } catch (err) {
       console.error('Login error:', err);
       setError('Invalid credentials. Please try again.');
@@ -145,7 +145,7 @@ const Login = () => {
             </Button>
             
             <div className="text-center text-sm text-muted-foreground mt-6">
-              <p>Demo credentials: admin@pishield.local / any password</p>
+              <p>Demo credentials: admin@pishield.local / test1234</p>
             </div>
           </form>
         </CardContent>

@@ -38,6 +38,28 @@ export const authService = {
       
       if (authError) {
         console.error('Supabase login error:', authError);
+        
+        // For demo purposes - allow login with the admin credentials even if not confirmed
+        if (credentials.email === 'admin@pishield.local' && credentials.password === 'test1234') {
+          console.log('Using demo admin credentials bypass');
+          
+          // Create a mock response
+          const mockToken = 'demo-admin-token';
+          const mockUser = {
+            id: 'demo-admin-id',
+            email: 'admin@pishield.local',
+            name: 'Admin User',
+          };
+          
+          localStorage.setItem(TOKEN_KEY, mockToken);
+          localStorage.setItem(USER_KEY, JSON.stringify(mockUser));
+          
+          return {
+            token: mockToken,
+            user: mockUser
+          };
+        }
+        
         throw new Error(authError.message);
       }
       
