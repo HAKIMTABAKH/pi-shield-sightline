@@ -1,10 +1,17 @@
 
 import { API_ENDPOINTS, getRequestOptions } from './config';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface LoginCredentials {
   email: string;
   password: string;
   rememberMe?: boolean;
+}
+
+export interface SignupCredentials {
+  email: string;
+  password: string;
+  name?: string;
 }
 
 export interface LoginResponse {
@@ -23,58 +30,74 @@ const USER_KEY = 'pishield_user';
 export const authService = {
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
     try {
-      // For demo purposes, simulate a successful login without actual API call
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Demo login with:', credentials);
-        
-        // Mock response for development
-        const mockResponse: LoginResponse = {
-          token: 'mock-jwt-token-' + Date.now(),
-          user: {
-            id: '1',
-            email: credentials.email,
-            name: 'Demo User',
-          }
-        };
-        
-        // Store auth data
-        localStorage.setItem(TOKEN_KEY, mockResponse.token);
-        localStorage.setItem(USER_KEY, JSON.stringify(mockResponse.user));
-        
-        return mockResponse;
-      }
-      
-      // Real API call for production
-      const response = await fetch(API_ENDPOINTS.auth.login, {
-        method: 'POST',
-        ...getRequestOptions(),
-        body: JSON.stringify(credentials),
+      // Authenticate with Supabase
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: credentials.email,
+        password: credentials.password,
       });
       
-      if (!response.ok) {
-        throw new Error('Login failed');
+      if (authError) {
+        console.error('Supabase login error:', authError);
+        throw new Error(authError.message);
       }
       
-      const data: LoginResponse = await response.json();
-      
       // Store auth data
-      localStorage.setItem(TOKEN_KEY, data.token);
-      localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+      const token = authData.session.access_token;
+      localStorage.setItem(TOKEN_KEY, token);
       
-      return data;
+      const user = {
+        id: authData.user.id,
+        email: authData.user.email || '',
+        name: authData.user.user_metadata?.name || 'User',
+      };
+      
+      localStorage.setItem(USER_KEY, JSON.stringify(user));
+      
+      return {
+        token,
+        user
+      };
     } catch (error) {
       console.error('Login error:', error);
       throw error;
     }
   },
   
-  logout(): void {
-    // Remove auth data
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
-    
-    // In a real app, you might want to call the logout endpoint as well
-    // fetch(API_ENDPOINTS.auth.logout, { method: 'POST', ...getRequestOptions(this.getToken()) });
+  async signup(credentials: SignupCredentials): Promise<void> {
+    try {
+      // Register with Supabase
+      const { error } = await supabase.auth.signUp({
+        email: credentials.email,
+        password: credentials.password,
+        options: {
+          data: {
+            name: credentials.name || ''
+          }
+        }
+      });
+      
+      if (error) {
+        console.error('Supabase signup error:', error);
+        throw new Error(error.message);
+      }
+    } catch (error) {
+      console.error('Signup error:', error);
+      throw error;
+    }
+  },
+  
+  async logout(): Promise<void> {
+    try {
+      // Sign out from Supabase
+      await supabase.auth.signOut();
+      
+      // Remove auth data from localStorage
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(USER_KEY);
+    } catch (error) {
+      console.error('Logout error:', error);
+      throw error;
+    }
   },
   
   getToken(): string | null {
@@ -88,5 +111,36 @@ export const authService = {
   
   isAuthenticated(): boolean {
     return !!this.getToken();
+  },
+  
+  // Listen for auth state changes
+  onAuthStateChange(callback: (user: LoginResponse['user'] | null) => void) {
+    // Set up listener for Supabase auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (event === 'SIGNED_IN' && session) {
+          const user = {
+            id: session.user.id,
+            email: session.user.email || '',
+            name: session.user.user_metadata?.name || 'User',
+          };
+          
+          localStorage.setItem(TOKEN_KEY, session.access_token);
+          localStorage.setItem(USER_KEY, JSON.stringify(user));
+          
+          callback(user);
+        } else if (event === 'SIGNED_OUT') {
+          localStorage.removeItem(TOKEN_KEY);
+          localStorage.removeItem(USER_KEY);
+          
+          callback(null);
+        }
+      }
+    );
+    
+    // Return unsubscribe function
+    return () => {
+      subscription.unsubscribe();
+    };
   }
 };

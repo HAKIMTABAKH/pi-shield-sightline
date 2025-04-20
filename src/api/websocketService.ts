@@ -2,6 +2,7 @@
 import { authService } from './authService';
 import { Alert } from './alertService';
 import { DashboardStats, AttackSource } from './dashboardService';
+import { supabase } from '@/integrations/supabase/client';
 
 type WebSocketEventType = 
   | 'STATS_UPDATE' 
@@ -24,19 +25,23 @@ class WebSocketService {
   private reconnectTimeout: number = 5000; // 5 seconds
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private mockInterval: ReturnType<typeof setInterval> | null = null;
+  private supabaseChannel: any = null;
   
   constructor() {
     this.eventListeners = new Map();
   }
   
   connect(url: string = 'ws://localhost:3001/ws'): void {
+    // Set up Supabase Realtime subscription
+    this.setupSupabaseRealtime();
+    
     // Don't reconnect if we're already connected
     if (this.socket && this.socket.readyState === WebSocket.OPEN) {
       return;
     }
     
     // In development mode, use mock websocket instead of real connection
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       console.log('Using mock WebSocket in development mode');
       this.setupMockWebSocket();
       return;
@@ -52,6 +57,14 @@ class WebSocketService {
       this.socket.onopen = () => {
         console.log('WebSocket connected');
         this.reconnectAttempts = 0;
+        
+        // Authenticate with WebSocket server
+        if (token) {
+          this.socket?.send(JSON.stringify({
+            type: 'AUTH',
+            token
+          }));
+        }
       };
       
       this.socket.onmessage = (event) => {
@@ -78,9 +91,16 @@ class WebSocketService {
   }
   
   disconnect(): void {
+    // Disconnect from WebSocket server
     if (this.socket) {
       this.socket.close();
       this.socket = null;
+    }
+    
+    // Disconnect from Supabase Realtime
+    if (this.supabaseChannel) {
+      supabase.removeChannel(this.supabaseChannel);
+      this.supabaseChannel = null;
     }
     
     if (this.reconnectTimer) {
@@ -113,6 +133,44 @@ class WebSocketService {
     if (index !== -1) {
       listeners.splice(index, 1);
     }
+  }
+  
+  private setupSupabaseRealtime(): void {
+    // Subscribe to Supabase Realtime changes for alerts table
+    this.supabaseChannel = supabase
+      .channel('public:alerts')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'alerts' },
+        (payload) => {
+          // Convert Supabase payload to our expected format
+          const message: WebSocketMessage = {
+            type: 'NEW_ALERT',
+            data: payload.new
+          };
+          
+          this.handleMessage(message);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'alerts' },
+        (payload) => {
+          // Only broadcast status updates
+          if (payload.old.status !== payload.new.status) {
+            const message: WebSocketMessage = {
+              type: 'ALERT_UPDATE',
+              data: {
+                id: payload.new.id,
+                status: payload.new.status
+              }
+            };
+            
+            this.handleMessage(message);
+          }
+        }
+      )
+      .subscribe();
   }
   
   private handleMessage(message: WebSocketMessage): void {
