@@ -18,6 +18,7 @@ const Dashboard = () => {
     deviceCount: 0
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [dataSource, setDataSource] = useState<'live' | 'demo'>('live');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -25,12 +26,19 @@ const Dashboard = () => {
       try {
         const stats = await dashboardService.getStats();
         setDashboardData(stats);
+        
+        if (process.env.NODE_ENV === 'development' || window.location.hostname !== 'localhost') {
+          setDataSource('demo');
+        } else {
+          setDataSource('live');
+        }
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
+        setDataSource('demo');
         toast({
-          title: "Failed to load dashboard data",
-          description: "Please check your connection to the Raspberry Pi.",
-          variant: "destructive"
+          title: "Using demo data",
+          description: "Could not connect to Raspberry Pi - showing simulated data instead.",
+          variant: "default"
         });
       } finally {
         setIsLoading(false);
@@ -88,6 +96,15 @@ const Dashboard = () => {
 
   return (
     <MainLayout title="Dashboard">
+      {dataSource === 'demo' && (
+        <div className="mb-6 px-4 py-3 bg-yellow-50 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 rounded-md">
+          <p className="text-sm font-medium flex items-center">
+            <AlertTriangle className="h-4 w-4 mr-2" />
+            Demo Mode: Displaying simulated security data. No connection to Raspberry Pi required.
+          </p>
+        </div>
+      )}
+      
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           title="Attacks Blocked (Today)"
