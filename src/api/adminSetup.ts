@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 export const createAdminUser = async () => {
   try {
+    // First check if admin user already exists
     const { data: existingUser, error: checkError } = await supabase
       .from('profiles')
       .select('id')
@@ -14,6 +15,7 @@ export const createAdminUser = async () => {
       return { success: true, message: 'Admin user already exists' };
     }
 
+    // Create the admin user
     const { data: newUser, error: signUpError } = await supabase.auth.signUp({
       email: 'admin@pishield.local',
       password: 'test1234',
