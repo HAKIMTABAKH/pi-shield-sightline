@@ -5,7 +5,6 @@ import MainLayout from '@/components/layout/MainLayout';
 import MetricCard from '@/components/dashboard/MetricCard';
 import AttackChart from '@/components/dashboard/AttackChart';
 import RecentAlerts from '@/components/dashboard/RecentAlerts';
-import AttackMap from '@/components/dashboard/AttackMap';
 import { dashboardService, DashboardStats } from '@/api/dashboardService';
 import { websocketService } from '@/api/websocketService';
 import { useToast } from '@/hooks/use-toast';
@@ -138,9 +137,7 @@ const Dashboard = () => {
         <RecentAlerts />
       </div>
       
-      <div className="mt-6 grid gap-6 md:grid-cols-3">
-        <AttackMap />
-      </div>
+     
     </MainLayout>
   );
 };
