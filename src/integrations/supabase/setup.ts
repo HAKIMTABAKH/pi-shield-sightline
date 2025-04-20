@@ -1,5 +1,8 @@
-
 import { supabase } from './client';
+import { Database } from './types';
+
+type Alert = Database['public']['Tables']['alerts']['Row'];
+type BlockedIp = Database['public']['Tables']['blocked_ips']['Row'];
 
 // Function to set up Supabase authentication listeners
 export const setupSupabaseAuth = (
@@ -62,10 +65,12 @@ export const connectToWebSocket = (token: string) => {
   return socket;
 };
 
-// Helper functions for common Supabase operations
-
 // Get alerts with filtering
-export const getAlerts = async (filters: any = {}) => {
+export const getAlerts = async (filters: {
+  severity?: string;
+  status?: string;
+  search?: string;
+} = {}) => {
   let query = supabase.from('alerts').select('*');
   
   if (filters.severity) {
@@ -77,7 +82,7 @@ export const getAlerts = async (filters: any = {}) => {
   }
   
   if (filters.search) {
-    query = query.or(`sourceIp.ilike.%${filters.search}%,type.ilike.%${filters.search}%`);
+    query = query.or(`source_ip.ilike.%${filters.search}%,type.ilike.%${filters.search}%`);
   }
   
   const { data, error } = await query;
@@ -90,7 +95,7 @@ export const getAlerts = async (filters: any = {}) => {
 };
 
 // Update alert status
-export const updateAlertStatus = async (alertId: string, status: string) => {
+export const updateAlertStatus = async (alertId: string, status: Alert['status']) => {
   const { data, error } = await supabase
     .from('alerts')
     .update({ status })

@@ -9,13 +9,75 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      alerts: {
+        Row: {
+          dest_port: number | null
+          details: string | null
+          id: string
+          severity: string
+          source_ip: string
+          status: string
+          timestamp: string
+          type: string
+        }
+        Insert: {
+          dest_port?: number | null
+          details?: string | null
+          id?: string
+          severity: string
+          source_ip: string
+          status?: string
+          timestamp?: string
+          type: string
+        }
+        Update: {
+          dest_port?: number | null
+          details?: string | null
+          id?: string
+          severity?: string
+          source_ip?: string
+          status?: string
+          timestamp?: string
+          type?: string
+        }
+        Relationships: []
+      }
+      blocked_ips: {
+        Row: {
+          blocked_by_user_id: string | null
+          created_at: string
+          id: string
+          ip_address: string
+          reason: string | null
+        }
+        Insert: {
+          blocked_by_user_id?: string | null
+          created_at?: string
+          id?: string
+          ip_address: string
+          reason?: string | null
+        }
+        Update: {
+          blocked_by_user_id?: string | null
+          created_at?: string
+          id?: string
+          ip_address?: string
+          reason?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_attacks_by_day: {
+        Args: { start_date: string; end_date: string }
+        Returns: {
+          day: string
+          count: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
