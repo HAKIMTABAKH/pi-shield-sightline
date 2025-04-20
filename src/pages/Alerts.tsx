@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { Bell } from 'lucide-react';
 import MainLayout from '@/components/layout/MainLayout';
-import AlertsTable, { Alert } from '@/components/alerts/AlertsTable';
+import AlertsTable from '@/components/alerts/AlertsTable';
 import { Input } from '@/components/ui/input';
 import { 
   Select, 
@@ -11,12 +11,20 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-import { alertService } from '@/api/alertService';
+import { alertService, Alert as ApiAlert } from '@/api/alertService';
 import { useToast } from '@/hooks/use-toast';
 import { websocketService } from '@/api/websocketService';
 
+// Map API alert type to the component's expected Alert type
+const mapApiAlertToComponentAlert = (apiAlert: ApiAlert) => {
+  return {
+    ...apiAlert,
+    destPort: apiAlert.destPort || 0, // Provide a default value for optional property
+  };
+};
+
 const Alerts = () => {
-  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [alerts, setAlerts] = useState<ApiAlert[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [severityFilter, setSeverityFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -57,7 +65,7 @@ const Alerts = () => {
     websocketService.connect();
 
     // Listen for new alerts
-    const handleNewAlert = (data: Alert) => {
+    const handleNewAlert = (data: ApiAlert) => {
       toast({
         title: `New ${data.severity} Alert`,
         description: `${data.type} from ${data.sourceIp}`,
@@ -78,7 +86,7 @@ const Alerts = () => {
     };
 
     // Listen for alert status updates
-    const handleAlertUpdate = (data: { id: string; status: Alert['status'] }) => {
+    const handleAlertUpdate = (data: { id: string; status: ApiAlert['status'] }) => {
       setAlerts(prev => 
         prev.map(alert => 
           alert.id === data.id 
@@ -99,7 +107,7 @@ const Alerts = () => {
   }, [toast, severityFilter, statusFilter, searchTerm]);
   
   // Handle alert status change
-  const handleStatusChange = async (alertId: string, newStatus: Alert['status']) => {
+  const handleStatusChange = async (alertId: string, newStatus: ApiAlert['status']) => {
     try {
       await alertService.updateAlertStatus(alertId, newStatus);
       
@@ -140,6 +148,9 @@ const Alerts = () => {
       });
     }
   };
+  
+  // Map API alerts to component alerts format
+  const mappedAlerts = alerts.map(mapApiAlertToComponentAlert);
   
   return (
     <MainLayout title="Alerts">
@@ -189,10 +200,9 @@ const Alerts = () => {
       </div>
       
       <AlertsTable 
-        alerts={alerts} 
+        alerts={mappedAlerts} 
         onStatusChange={handleStatusChange}
         onBlockIp={handleBlockIp}
-        isLoading={isLoading}
       />
       
       <div className="text-sm text-muted-foreground mt-4">
